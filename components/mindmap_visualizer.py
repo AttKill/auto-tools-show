@@ -421,7 +421,9 @@ def visualize_mindmap():
                 for path in all_paths:
                     path_split_values = path.split("##")
                     for i in range(len(path_split_values)):
-                        line_content = f"{'#' * (i + 1)}{path_split_values[i]}\n\n"
+                        line_content_with_prefix = path_split_values[i]
+                        line_content = line_content_with_prefix.replace("Given:", "").replace("When:", "").replace("Then:","").strip()
+                        line_content = f"{'#' * (i + 1)}{line_content}\n\n"
                         if line_content not in added_lines:  # 检查是否已存在
                             added_lines.add(line_content)
                             export_text += line_content

@@ -53,60 +53,77 @@ except ImportError:
 
             return node_id
 
-        def generate_from_dataframe(self, df: pd.DataFrame, center_topic: str) -> dict:
+        def generate_from_dataframe(self, df: pd.DataFrame, center_topic: str,
+                                    split_columns: dict = None) -> dict:
+            """
+            从DataFrame生成思维导图数据
+
+            Args:
+                df: 包含given/when/then数据的DataFrame
+                center_topic: 中心主题名称
+                split_columns: 需要拆分的列配置，格式为 {列名: 分隔符}，默认为 {'given': '-'}
+            """
+            if split_columns is None:
+                split_columns = {'given': '-', 'when': '-'}
+
             self.nodes = []
             self.edges = []
             self.node_counter = 0
 
             root_id = self._add_node(center_topic, 0, None, "center", ["中心主题"])
-            given_nodes = {}
+            # 存储各列的节点路径映射
+            column_nodes = {}
 
             for _, row in df.iterrows():
-                given_parts = str(row['given']).split('-')
                 current_parent = root_id
 
-                for i, part in enumerate(given_parts):
-                    part = part.strip()
-                    if not part:
-                        continue
+                # 按照split_columns配置处理每一列
+                for col_name, separator in split_columns.items():
+                    if col_name in df.columns:
+                        parts = str(row[col_name]).split(separator)
 
-                    given_path = '-'.join(given_parts[:i + 1])
+                        # 初始化当前列的节点映射
+                        if col_name not in column_nodes:
+                            column_nodes[col_name] = {}
 
-                    if given_path not in given_nodes:
-                        node_id = self._add_node(
-                            part,
-                            level=i + 1,
-                            parent_id=current_parent,
-                            node_type="given",
-                            tags=["given"]
-                        )
-                        given_nodes[given_path] = node_id
+                        # 逐层构建节点
+                        for i, part in enumerate(parts):
+                            part = part.strip()
+                            if not part:
+                                continue
 
-                    current_parent = given_nodes[given_path]
+                            # 构建路径标识
+                            path_key = separator.join(parts[:i + 1])
 
-                last_given_node = current_parent
+                            # 检查节点是否已存在
+                            if path_key not in column_nodes[col_name]:
+                                # 为拆分列的节点添加标签前缀(原始node_label=part)
+                                node_label = f"{col_name.capitalize()}: {part}"
+                                node_id = self._add_node(
+                                    node_label,
+                                    level=self._calculate_level(current_parent, i, col_name, split_columns),
+                                    parent_id=current_parent,
+                                    node_type=col_name,
+                                    tags=[col_name]
+                                )
+                                column_nodes[col_name][path_key] = node_id
 
-                when_label = str(row['when']).strip()
-                if when_label:
-                    when_id = self._add_node(
-                        f"When: {when_label}",
-                        level=len(given_parts) + 1,
-                        parent_id=last_given_node,
-                        node_type="when",
-                        tags=["when"]
-                    )
-                else:
-                    when_id = last_given_node
+                            current_parent = column_nodes[col_name][path_key]
 
-                then_label = str(row['then']).strip()
-                if then_label:
-                    self._add_node(
-                        f"Then: {then_label}",
-                        level=len(given_parts) + 2,
-                        parent_id=when_id if when_label else last_given_node,
-                        node_type="then",
-                        tags=["then"]
-                    )
+                # 处理不在split_columns中的其他列（如then）
+                for col_name in df.columns:
+                    if col_name not in split_columns:  # 非拆分列
+                        value = str(row[col_name]).strip()
+                        if value:
+                            # 为非拆分列添加节点
+                            node_id = self._add_node(
+                                f"{col_name.capitalize()}: {value}",
+                                level=self._calculate_level(current_parent, 0, col_name, split_columns),
+                                parent_id=current_parent,
+                                node_type=col_name,
+                                tags=[col_name]
+                            )
+                            current_parent = node_id
 
             return {
                 "center_topic": center_topic,
@@ -121,6 +138,21 @@ except ImportError:
                 }
             }
 
+        def _calculate_level(self, parent_node_id: str, position_in_split: int,
+                             column_name: str, split_columns: dict) -> int:
+            """计算节点层级"""
+            # 找到父节点的层级
+            parent_level = 0
+            for node in self.nodes:
+                if node["id"] == parent_node_id:
+                    parent_level = node["level"]
+                    break
+
+            # 如果是拆分列中的第一个部分，层级加1；否则再加position
+            if column_name in split_columns:
+                return parent_level + 1 + position_in_split
+            else:
+                return parent_level + 1
 
     class ExcelHandler:
         def read_excel(self, file_buffer):
@@ -411,35 +443,31 @@ def render_mindmap_tab():
     else:
         st.info("请先导入数据并生成思维导图")
 
-
 def render_treemap():
-    """渲染树状图"""
+    """渲染树状图
+
+    TODO 文本内容也不允许重复
+    """
     try:
-        nodes = st.session_state.mindmap_data['nodes']
+        mindmap_data = st.session_state.mindmap_data
+        nodes = mindmap_data['nodes']
+        edges = mindmap_data['edges']
+
+        # 创建节点ID到标签的映射
+        node_id_to_label = {node['id']: node['label'] for node in nodes}
 
         # 构建树状图数据
-        labels = [node['label'] for node in nodes]
+        labels = []
         parents = []
-
-        # 为每个节点找到父节点
-        for node in nodes:
-            if node['type'] == 'center':
-                parents.append("")
-            else:
-                # 查找父节点
-                parent_found = False
-                for edge in st.session_state.mindmap_data['edges']:
-                    if edge['to'] == node['id']:
-                        parent_node = next(n for n in nodes if n['id'] == edge['from'])
-                        parents.append(parent_node['label'])
-                        parent_found = True
-                        break
-                if not parent_found:
-                    parents.append("")
-
-        # 定义颜色映射
         colors = []
+        types = []
+
+        # 遍历所有节点
         for node in nodes:
+            labels.append(node['label'])
+            types.append(node['type'])
+
+            # 设置颜色
             if node['type'] == 'center':
                 colors.append('#FF6B6B')
             elif node['type'] == 'given':
@@ -451,24 +479,62 @@ def render_treemap():
             else:
                 colors.append('#FFEAA7')
 
+            # 根据edges关系确定父节点，不考虑节点类型
+            parent_label = ""
+            for edge in edges:
+                if edge['to'] == node['id']:
+                    parent_id = edge['from']
+                    if parent_id in node_id_to_label:
+                        parent_label = node_id_to_label[parent_id]
+                    break
+
+            parents.append(parent_label)
+
+        # 验证数据一致性
+        assert len(labels) == len(parents) == len(colors) == len(types), \
+            f"数据长度不一致: labels({len(labels)}), parents({len(parents)}), colors({len(colors)}), customdata({len(types)})"
+
+        print(f"Labels: {labels}")  # 调试信息
+        print(f"Parents: {parents}")  # 调试信息
+
+        # 检查是否存在空标签或无效的父子关系
+        for i, (label, parent) in enumerate(zip(labels, parents)):
+            if not label:
+                print(f"警告: 第{i}个节点标签为空")
+            if parent not in labels and parent != "":
+                print(f"警告: 第{i}个节点的父节点'{parent}'不存在于标签中")
+
         fig = go.Figure(go.Treemap(
             labels=labels,
             parents=parents,
-            textinfo="label+value",
-            marker_colors=colors,
+            marker=dict(
+                colors=colors,
+                line=dict(width=2, color="white")  # 添加边框线，提高可见性
+            ),
+            customdata=types,
             hovertemplate="<b>%{label}</b><br>类型: %{customdata}<extra></extra>",
-            customdata=[node['type'] for node in nodes]
+            textinfo="label",  # 只显示标签
         ))
 
         fig.update_layout(
             title="思维导图 - 树状图视图",
-            height=600
+            height=600,
+            margin=dict(t=50, b=50, l=50, r=50)  # 设置边距
         )
+
+        # 检查是否有有效数据
+        if len([l for l in labels if l]) == 0:
+            st.warning("没有有效的标签数据用于显示")
+            return
 
         st.plotly_chart(fig, use_container_width=True)
 
+    except AssertionError as e:
+        st.error(f"数据验证失败: {str(e)}")
     except Exception as e:
         st.error(f"生成树状图时出错: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc())
 
 
 def render_export_options():

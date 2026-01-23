@@ -31,7 +31,7 @@ def json_to_excel_simple(json_data: dict) -> dict:
             resources = node_data.get('resource',[])
             if text:
                 # 清理when/then前缀
-                clean_text = text.replace("Given:", "").replace("when:", "").replace("then:","").strip()
+                clean_text = text.replace("Given:", "").replace("When:", "").replace("Then:","").strip()
                 if resources is not None and len(resources) > 0:
                     clean_text += "".join(resources)
                 path.append(clean_text)
