@@ -26,27 +26,42 @@ def json_to_excel_simple(json_data: dict) -> dict:
 
         # 获取当前节点的文本
         if 'data' in node and 'text' in node['data']:
-            text = node['data']['text'].strip()
+            node_data = node['data']
+            text = node_data['text'].strip()
+            resources = node_data.get('resource',[])
             if text:
                 # 清理when/then前缀
-                clean_text = text.replace("When:", "").replace("Then:", "").replace("when:", "").replace("then:",
-                                                                                                         "").strip()
+                clean_text = text.replace("Given:", "").replace("when:", "").replace("then:","").strip()
+                if resources is not None and len(resources) > 0:
+                    clean_text += "".join(resources)
                 path.append(clean_text)
 
         # 如果是叶子节点（没有子节点或子节点为空）
         if not node.get('children') or len(node['children']) == 0:
             # 确保路径至少有3个节点
             if len(path) >= 3:
+
                 # 构建given列：从第二个节点开始，排除最后两个
                 given_parts = []
+                when_parts = []
                 for i in range(1, len(path) - 2):
-                    given_parts.append(path[i])
-
+                    clean_text_with_prefix = path[i]
+                    clean_text = clean_text_with_prefix.replace("given", "").replace("when", "").replace("then", "").strip()
+                    if "given" in clean_text_with_prefix:
+                        given_parts.append(clean_text)
+                    elif "when" in clean_text_with_prefix:
+                        when_parts.append(clean_text)
+                    else:
+                        given_parts.append(clean_text_with_prefix)
+                print(f"given_parts:{given_parts}")
                 given = "-".join(given_parts) if given_parts else ""
 
-                # 获取when和then（倒数第二和最后一个）
-                when = path[-2] if len(path) >= 2 else ""
-                then = path[-1] if len(path) >= 1 else ""
+                # 获取when,默认倒数第二个
+                when_parts.append(path[-2])
+                when = "-".join(when_parts)
+
+                # 获取then,默认最后一个
+                then = path[-1]
 
                 # 添加到结果
                 results.append({
