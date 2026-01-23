@@ -128,38 +128,6 @@ def read_json_to_excel(json_input):
         raise Exception(f"读取JSON文件失败: {str(e)}")
 
 
-# 使用示例
-def example_usage(json_str: str):
-    """使用示例"""
-
-    # 样例JSON数据
-    json_str = """{"root":{"data":{"text":"测试用例"},
-     "children":[
-     {"data":{"text":"用户登录","font-size":32},"children":[{"data":{"text":"成功登录","priority":3},"children":[{"data":{"text":"When: 输入正确用户名和密码"},"children":[{"data":{"text":"Then: 跳转到首页"},"children":[]}]}]},
-     {"data":{"text":"失败登录"},"children":[{"data":{"text":"When: 输入错误密码"},"children":[{"data":{"text":"Then: 显示错误提示"},"children":[]}]}]}]},
-     {"data":{"text":"购物车","progress":3},"children":[{"data":{"text":"添加商品"},"children":[{"data":{"text":"When: 点击加入购物车按钮"},"children":[{"data":{"text":"Then: 商品数量增加"},"children":[]}]}]},
-     {"data":{"text":"删除商品"},"children":[{"data":{"text":"When: 点击删除按钮"},"children":[{"data":{"text":"Then: 商品从购物车移除"},"children":[]}]}]}]}]},"template":"right","theme":"fresh-blue","version":"1.4.43"}"""
-
-    print("JSON转换示例:")
-    print("=" * 60)
-
-    # 1. 使用JSON字符串
-    sheets_data = read_json_to_excel(json_str)
-
-    for sheet_name, df in sheets_data.items():
-        print(f"\nSheet名称: {sheet_name}")
-        print(df.to_string(index=False))
-        print(f"\n数据形状: {df.shape}")
-        print(f"列名: {list(df.columns)}")
-
-        # 显示每行数据
-        print("\n详细数据:")
-        for idx, row in df.iterrows():
-            print(f"行 {idx}: given='{row['given']}', when='{row['when']}', then='{row['then']}'")
-
-    return sheets_data
-
-
 # 保存到Excel文件的函数
 def save_to_excel(sheets_data: dict, output_path: str):
     """
@@ -174,21 +142,3 @@ def save_to_excel(sheets_data: dict, output_path: str):
             df.to_excel(writer, sheet_name=sheet_name, index=False)
 
     print(f"文件已保存: {output_path}")
-
-
-# 测试函数
-if __name__ == "__main__":
-    # 运行示例
-    sheets_data = example_usage()
-
-    # 保存到Excel（如果需要）
-    save_to_excel(sheets_data, 'output.xlsx')
-
-    # 验证输出是否符合要求
-    print("\n" + "=" * 60)
-    print("验证输出格式:")
-
-    for sheet_name, df in sheets_data.items():
-        print(f"\nSheet: {sheet_name}")
-        print("-" * 60)
-        print(df.to_string(index=False))

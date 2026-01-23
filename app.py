@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from components.json_to_excel import example_usage
+from components.json_visualizer import read_json_to_excel
 
 # 添加utils路径到系统路径
 streamlit_dir = Path(__file__).parent
@@ -248,7 +248,6 @@ def render_data_import_tab(uploaded_file):
                 df = sheets_data[selected_sheet]
                 st.session_state.df = df
                 st.session_state.excel_path = uploaded_file.name
-
                 # 显示数据预览
                 st.subheader("📋 数据预览")
                 st.dataframe(df, use_container_width=True)
@@ -345,8 +344,7 @@ def render_example_section():
             json_data = json.load(uploaded_json)
 
             # 调用example_usage函数处理数据
-            sheets_data = example_usage(json_data)
-
+            sheets_data = read_json_to_excel(json_data)
             # 生成Excel文件供下载
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -365,16 +363,6 @@ def render_example_section():
 
         except Exception as e:
             st.error(f"处理JSON文件时出错: {str(e)}")
-    # spec = importlib.util.spec_from_file_location(
-    #     "skill_module",
-    #     streamlit_dir / "components/mindmap_visualizer.py"
-    # )
-    # skill_module = importlib.util.module_from_spec(spec)
-    # spec.loader.exec_module(skill_module)
-    #
-    # # 动态获取函数并调用
-    # skill_function = getattr(skill_module, "visualize_mindmap")
-    # skill_function()
 
 
 def render_mindmap_tab():
@@ -485,9 +473,9 @@ def render_treemap():
 
 def render_export_options():
     """渲染导出选项"""
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
 
-    with col1:
+    with (col1):
         if st.button("📥 导出为JSON", use_container_width=True):
             json_str = json.dumps(st.session_state.mindmap_data, ensure_ascii=False, indent=2)
             st.download_button(
@@ -515,9 +503,6 @@ def render_export_options():
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
-
-    with col3:
-        st.info("图片导出功能需要额外配置")
 
 
 def render_data_management_tab():
