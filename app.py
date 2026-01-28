@@ -312,90 +312,96 @@ def render_example_section():
     """渲染示例数据部分"""
     st.info("请上传Excel文件开始使用")
 
-    # 示例数据下载
-    st.divider()
-    st.subheader("📋 示例文件格式")
+    # 示例数据可折叠区域
+    with st.expander("📋 示例文件", expanded=True):
+        # 显示示例数据
+        example_data = {
+            'given': [
+                '用户登录-成功登录',
+                '用户登录-失败登录',
+                '购物车-添加商品',
+                '购物车-删除商品'
+            ],
+            'when': [
+                '输入正确用户名和密码',
+                '输入错误密码',
+                '点击加入购物车按钮',
+                '点击删除按钮'
+            ],
+            'then': [
+                '跳转到首页',
+                '显示错误提示',
+                '商品数量增加',
+                '商品从购物车移除'
+            ]
+        }
 
-    # 显示示例数据
-    example_data = {
-        'given': [
-            '用户登录-成功登录',
-            '用户登录-失败登录',
-            '购物车-添加商品',
-            '购物车-删除商品'
-        ],
-        'when': [
-            '输入正确用户名和密码',
-            '输入错误密码',
-            '点击加入购物车按钮',
-            '点击删除按钮'
-        ],
-        'then': [
-            '跳转到首页',
-            '显示错误提示',
-            '商品数量增加',
-            '商品从购物车移除'
-        ]
-    }
+        example_df = pd.DataFrame(example_data)
+        st.dataframe(example_df, use_container_width=True)
 
-    example_df = pd.DataFrame(example_data)
-    st.dataframe(example_df, use_container_width=True)
+        st.markdown("""
+        **Excel格式要求：**
+        - 必须包含三列：`given`、`when`、`then`
+        - `given`列支持用`-`分割多级结构
+        - 列名不区分大小写
+        - 支持多个sheet页
+        """)
 
-    st.markdown("""
-    **Excel格式要求：**
-    - 必须包含三列：`given`、`when`、`then`
-    - `given`列支持用`-`分割多级结构
-    - 列名不区分大小写
-    - 支持多个sheet页
-    """)
-
-    # 提供示例文件下载
-    @st.cache_data
-    def create_example_excel():
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            example_df.to_excel(writer, sheet_name='测试用例', index=False)
-        return output.getvalue()
-
-    excel_bytes = create_example_excel()
-    st.download_button(
-        label="📥 下载示例文件",
-        data=excel_bytes,
-        file_name="mindmap_example.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True
-    )
-
-    # 新增：JSON转换功能
-    st.subheader("🔄 JSON转换")
-    uploaded_json = st.file_uploader("在<https://www.iodraw.com/mind>导出JSON文件并上传", type=['json'],
-                                     key="json_converter")
-    if uploaded_json is not None:
-        try:
-            # 读取JSON数据
-            json_data = json.load(uploaded_json)
-
-            # 调用example_usage函数处理数据
-            sheets_data = read_json_to_excel(json_data)
-            # 生成Excel文件供下载
+        # 提供示例文件下载
+        @st.cache_data
+        def create_example_excel():
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                for sheet_name, df in sheets_data.items():
-                    df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+                example_df.to_excel(writer, sheet_name='测试用例', index=False)
+            return output.getvalue()
 
-            st.download_button(
-                label="📥 下载转换后的Excel文件",
-                data=output.getvalue(),
-                file_name="converted_output.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
+        excel_bytes = create_example_excel()
+        st.download_button(
+            label="📥 下载示例文件",
+            data=excel_bytes,
+            file_name="mindmap_example.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
 
-            st.success("JSON文件转换完成！")
+    # JSON转换可折叠功能
+    with st.expander("🔄 JSON转换", expanded=False):
+        st.markdown("在 [iodraw](https://www.iodraw.com/mind) 导出JSON文件并上传进行转换")
+        uploaded_json = st.file_uploader("上传JSON文件", type=['json'], key="json_converter")
 
-        except Exception as e:
-            st.error(f"处理JSON文件时出错: {str(e)}")
+        if uploaded_json is not None:
+            try:
+                # 读取JSON数据
+                json_data = json.load(uploaded_json)
+                # 调用example_usage函数处理数据
+                json2excel_dict = read_json_to_excel(json_data)
+                sheets_data = json2excel_dict.get("sheets_data")
+                show_parse_json_dict = json2excel_dict.get("show_parse_json_dict")
+                table_heads = show_parse_json_dict.get("table_heads")
+                table_heads_data =show_parse_json_dict.get("show_data")
 
+                st.success(f"JSON文件转换完成！标签清单[{table_heads}];[{table_heads_data}]")
+
+                example_df1 = pd.DataFrame(table_heads_data)
+                st.dataframe(example_df1, use_container_width=True)
+
+                # 生成Excel文件供下载
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    for sheet_name, df in sheets_data.items():
+                        df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+
+                st.download_button(
+                    label="📥 下载转换后的Excel文件",
+                    data=output.getvalue(),
+                    file_name="converted_output.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+
+
+            except Exception as e:
+                st.error(f"处理JSON文件时出错: {str(e)}")
 
 def render_mindmap_tab():
     """渲染思维导图标签页"""
