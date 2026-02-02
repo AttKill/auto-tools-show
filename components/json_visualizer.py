@@ -69,34 +69,42 @@ def json_to_excel_simple(json_data: dict) -> dict:
                     extended_path = path
 
                 # 构建每列的数据
-                column_parts = {}
-                for idx, column_name in enumerate(show_parse_json_dict["table_heads"]):
-                    if idx == 0:  # 第一列，通常为given
-                        # 从第二个节点开始到倒数第(num_columns-1)个节点
-                        start_idx = 1
-                        end_idx = len(extended_path) - (num_columns - 1)
-                        parts = []
-                        for i in range(start_idx, max(start_idx, end_idx)):
-                            clean_text_with_prefix = extended_path[i]
-                            clean_text = clean_text_with_prefix.replace("given", "").replace("when", "").replace("then",
-                                                                                                                 "").strip()
-                            if column_name in clean_text_with_prefix.lower():
-                                parts.append(clean_text)
-                            else:
-                                parts.append(clean_text_with_prefix)
-                        column_value = "-".join(parts) if parts else ""
-                    elif idx == num_columns - 1:  # 最后一列，通常为then
-                        # 使用最后一个路径元素
-                        column_value = extended_path[-1]
-                    else:  # 中间列，通常为when等
-                        # 使用对应位置的路径元素
-                        pos = -(num_columns - idx)
-                        if abs(pos) <= len(extended_path):
-                            column_value = extended_path[pos]
-                        else:
-                            column_value = ""
+                column_parts = {col: "/" for col in show_parse_json_dict["table_heads"]}  # 初始化所有列为"/"
 
-                    column_parts[column_name] = column_value
+                # 处理每个路径元素
+                for path_element in extended_path:
+                    # 检查此路径元素包含哪些标签
+                    content_without_labels = path_element
+                    matched_labels = []
+
+                    # 找出所有匹配的标签
+                    for label in show_parse_json_dict["table_heads"]:
+                        if label.lower() in path_element.lower():
+                            matched_labels.append(label)
+                            # 移除标签名称，保留纯内容
+                            content_without_labels = content_without_labels.replace(label, "", 1).strip()
+
+                    # 如果没有匹配到标签，需要决定如何分配
+                    if not matched_labels:
+                        # 可以根据位置分配到某一列，或跳过
+                        continue
+
+                    # 将内容分配给所有匹配的标签列
+                    for label in matched_labels:
+                        content = content_without_labels if content_without_labels else "/"
+
+                        # 如果该列已有内容，用"-"连接
+                        if column_parts[label] != "/":
+                            if content != "/":
+                                column_parts[label] = f"{column_parts[label]}-{content}"
+                            # 如果内容是"/"，保持原有内容
+                        else:
+                            column_parts[label] = content
+
+                # 确保所有列都有值（即使是"/"）
+                for label in show_parse_json_dict["table_heads"]:
+                    if label not in column_parts:
+                        column_parts[label] = "/"
 
                 line_data_dict = column_parts
 
