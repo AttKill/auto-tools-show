@@ -4,6 +4,15 @@ from typing import List
 
 import pandas as pd
 
+def find_parent_label(path: List[str], table_heads: List[str]) -> str:
+    """
+    查找路径中最近的带有标签的父节点
+    """
+    for i in range(len(path) - 1, -1, -1):  # 从当前节点向上回溯
+        for label in table_heads:
+            if label.lower() in path[i].lower():
+                return label
+    return None  # 如果没找到，返回 None
 
 def json_to_excel_simple(json_data: dict) -> dict:
     """
@@ -47,79 +56,82 @@ def json_to_excel_simple(json_data: dict) -> dict:
                     clean_text += "".join(resources)
                 path.append(clean_text)
 
-        ## 设置默认的标签(如果使用默认标签，最后两个节点对应when和then,其他节点内容拼接到given上)
-        if len(show_parse_json_dict["table_heads"]) == 0:
-            show_parse_json_dict["table_heads"].append("given")
-            show_parse_json_dict["table_heads"].append("when")
-            show_parse_json_dict["table_heads"].append("then")
-
         # 如果是叶子节点（没有子节点或子节点为空）
         if not node.get('children') or len(node['children']) == 0:
             # 确保路径至少有3个节点
-            if len(path) >= 3:
-                # 计算需要分配的列数
-                num_columns = len(show_parse_json_dict["table_heads"])
-                min_path_length = num_columns
+            ## if len(path) >= 3:
+            # 计算需要分配的列数
+            num_columns = len(show_parse_json_dict["table_heads"])
+            min_path_length = num_columns
 
-                # 如果路径长度不够，使用默认值
-                if len(path) < min_path_length:
-                    # 扩展路径，使用空字符串填充
-                    extended_path = path + [""] * (min_path_length - len(path))
-                else:
-                    extended_path = path
+            # 如果路径长度不够，使用默认值
+            if len(path) < min_path_length:
+                # 扩展路径，使用空字符串填充
+                extended_path = path + [""] * (min_path_length - len(path))
+            else:
+                extended_path = path
 
-                # 构建每列的数据
-                column_parts = {col: "/" for col in show_parse_json_dict["table_heads"]}  # 初始化所有列为"/"
+            # 构建每列的数据
+            column_parts = {col: "/" for col in show_parse_json_dict["table_heads"]}
+            # 处理每个路径元素
+            for path_element in extended_path:
+                # 检查此路径元素包含哪些标签
+                content_without_labels = path_element
+                matched_labels = []
 
-                # 处理每个路径元素
-                for path_element in extended_path:
-                    # 检查此路径元素包含哪些标签
-                    content_without_labels = path_element
-                    matched_labels = []
-
-                    # 找出所有匹配的标签
-                    for label in show_parse_json_dict["table_heads"]:
-                        if label.lower() in path_element.lower():
-                            matched_labels.append(label)
-                            # 移除标签名称，保留纯内容
-                            content_without_labels = content_without_labels.replace(label, "", 1).strip()
-
-                    # 如果没有匹配到标签，需要决定如何分配
-                    if not matched_labels:
-                        # 可以根据位置分配到某一列，或跳过
-                        continue
-
-                    # 将内容分配给所有匹配的标签列
-                    for label in matched_labels:
-                        content = content_without_labels if content_without_labels else "/"
-
-                        # 如果该列已有内容，用"-"连接
-                        if column_parts[label] != "/":
-                            if content != "/":
-                                column_parts[label] = f"{column_parts[label]}-{content}"
-                            # 如果内容是"/"，保持原有内容
-                        else:
-                            column_parts[label] = content
-
-                # 确保所有列都有值（即使是"/"）
+                # 找出所有匹配的标签
                 for label in show_parse_json_dict["table_heads"]:
-                    if label not in column_parts:
-                        column_parts[label] = "/"
+                    if label.lower() in path_element.lower():
+                        matched_labels.append(label)
+                        # 移除标签名称，保留纯内容
+                        content_without_labels = content_without_labels.replace(label, "", 1).strip()
 
-                line_data_dict = column_parts
+                # 如果没有匹配到标签，需要决定如何分配
+                if not matched_labels:
+                    # 分配到父节点的标签列
+                    parent_label = find_parent_label(path, show_parse_json_dict["table_heads"])
+                    if parent_label:
+                        matched_labels.append(parent_label)
+                    else:
+                        # 如果到起始节点都没有标签，分配到 other 列
+                        matched_labels.append("other")
 
-                # 添加到结果
-                results.append(line_data_dict)
+                # 将内容分配给所有匹配的标签列
+                for label in matched_labels:
+                    content = content_without_labels if content_without_labels else "/"
 
-                for table_head in show_parse_json_dict["table_heads"]:
-                    if table_head not in show_parse_json_dict["show_data"]:
-                        show_parse_json_dict["show_data"][table_head] = []
-                    show_parse_json_dict["show_data"][table_head].append(line_data_dict.get(table_head, "/"))
+                    # 如果该列已有内容，用"-"连接
+                    if column_parts[label] != "/":
+                        if content != "/":
+                            column_parts[label] = f"{column_parts[label]}-{content}"
+                        # 如果内容是"/"，保持原有内容
+                    else:
+                        column_parts[label] = content
+
+            # 确保所有列都有值（即使是"/"）
+            for label in show_parse_json_dict["table_heads"]:
+                if label not in column_parts:
+                    column_parts[label] = "/"
+
+            # 特殊处理 other 列：只有在 other 列有数据时才保留
+            if "other" in column_parts and column_parts["other"] == "/":
+                del column_parts["other"]
+
+            line_data_dict = column_parts
+
+            # 添加到结果
+            results.append(line_data_dict)
+
+            for table_head in show_parse_json_dict["table_heads"]:
+                if table_head not in show_parse_json_dict["show_data"]:
+                    show_parse_json_dict["show_data"][table_head] = []
+                show_parse_json_dict["show_data"][table_head].append(line_data_dict.get(table_head, "/"))
 
         else:
             # 继续遍历子节点
             for child in node['children']:
                 traverse(child, path.copy(), results, show_parse_json_dict)
+
 
         return results, show_parse_json_dict
 
