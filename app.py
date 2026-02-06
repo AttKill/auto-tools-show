@@ -378,10 +378,19 @@ def render_example_section():
                 sheets_data = json2excel_dict.get("sheets_data")
                 show_parse_json_dict = json2excel_dict.get("show_parse_json_dict")
                 table_heads = show_parse_json_dict.get("table_heads")
+                add_icon_items = show_parse_json_dict.get("add_icon_items")
                 table_heads_data =show_parse_json_dict.get("show_data")
-
-                st.success(f"JSON文件转换完成！标签清单[{table_heads}];[{table_heads_data}]")
-
+                st.markdown(
+                    f"""
+                    <div style="padding: 10px; background-color: #d4edda; border-radius: 5px; border: 1px solid #c3e6cb; color: #155724;">
+                        <strong>✅ JSON文件转换完成！</strong><br>
+                        标签清单: [{table_heads}]<br>
+                        自动补全标签项: [{add_icon_items}]
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                ## 预览
                 example_df1 = pd.DataFrame(table_heads_data)
                 st.dataframe(example_df1, use_container_width=True)
 
