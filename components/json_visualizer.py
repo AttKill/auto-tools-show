@@ -161,10 +161,10 @@ def json_to_excel_simple(json_data: dict) -> dict:
             else:
                 current_length = len(show_parse_json_dict["show_data"][table_head])
                 if current_length < expected_length:
-                    # 补齐缺失的数据
-                    show_parse_json_dict["show_data"][table_head].extend(
-                        ["/"] * (expected_length - current_length)
-                    )
+                    # 需要在开头补齐缺失的数据
+                    missing_count = expected_length - current_length
+                    show_parse_json_dict["show_data"][table_head] = \
+                        ["/"] * missing_count + show_parse_json_dict["show_data"][table_head]
 
         # 创建DataFrame
         if results:
